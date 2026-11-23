@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Text } from '@react-three/drei';
 import SplitFlapChar from './SplitFlapChar';
 import { CATEGORY_COLORS, type BoardEntry } from '../data/mockFeed';
@@ -12,9 +13,12 @@ interface BoardRowProps {
   entry: BoardEntry;
   index: number;
   y: number;
+  selected: boolean;
+  onSelect: () => void;
 }
 
-export default function BoardRow({ entry, index, y }: BoardRowProps) {
+export default function BoardRow({ entry, index, y, selected, onSelect }: BoardRowProps) {
+  const [hovered, setHovered] = useState(false);
   let cellIndex = 0;
   const items = [
     { key: 'category', value: ' ', color: CATEGORY_COLORS[entry.category] },
@@ -29,7 +33,32 @@ export default function BoardRow({ entry, index, y }: BoardRowProps) {
   ];
 
   return (
-    <>
+    <group>
+      <mesh
+        position={[0, y, 0.389]}
+        onPointerOver={(event) => {
+          event.stopPropagation();
+          setHovered(true);
+          document.body.style.cursor = 'pointer';
+        }}
+        onPointerOut={() => {
+          setHovered(false);
+          document.body.style.cursor = '';
+        }}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect();
+        }}
+      >
+        <planeGeometry args={[9.9, 0.4]} />
+        <meshBasicMaterial
+          color={selected ? '#e5c28a' : '#f5ead7'}
+          transparent
+          opacity={selected ? 0.16 : hovered ? 0.1 : 0}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
       {items.map((item) =>
         Array.from(item.value).map((character, characterIndex) => {
           const currentIndex = cellIndex;
@@ -46,7 +75,7 @@ export default function BoardRow({ entry, index, y }: BoardRowProps) {
           );
         }),
       )}
-    </>
+    </group>
   );
 }
 

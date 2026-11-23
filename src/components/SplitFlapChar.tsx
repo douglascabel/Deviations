@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { playFlap } from '../utils/soundEngine';
 
 const CELL_WIDTH = 0.182;
 const CELL_HEIGHT = 0.37;
@@ -18,6 +19,7 @@ interface CellDescriptor {
   delay: number;
   position: [number, number, number];
   startAt: number;
+  soundPlayed: boolean;
 }
 
 interface BatchContextValue {
@@ -152,6 +154,7 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
       cells.current.set(id, {
         ...cell,
         startAt: clock.elapsedTime + Math.max(0, cell.delay),
+        soundPlayed: false,
       });
       latestAnimationEnd.current = Math.max(
         latestAnimationEnd.current,
@@ -193,6 +196,10 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
 
     for (const cell of cells.current.values()) {
       const progress = Math.min((clock.elapsedTime - cell.startAt) / FLIP_DURATION, 1);
+      if (!cell.soundPlayed && progress >= 0) {
+        playFlap();
+        cell.soundPlayed = true;
+      }
       const normalized = Math.max(0, progress);
       active ||= progress < 1;
       const phase = normalized < 0.5 ? normalized * 2 : (1 - normalized) * 2;

@@ -23,7 +23,7 @@ interface CellDescriptor {
 }
 
 interface BatchContextValue {
-  register: (id: string, cell: Omit<CellDescriptor, 'startAt'>) => void;
+  register: (id: string, cell: Omit<CellDescriptor, 'startAt' | 'soundPlayed'>) => void;
   unregister: (id: string) => void;
 }
 

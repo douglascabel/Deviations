@@ -71,6 +71,7 @@ export default function BoardRow({ entry, index, y, selected, onSelect }: BoardR
               color={item.color}
               delay={index * 0.055 + currentIndex * 0.012}
               position={[START_X + currentIndex * CELL_PITCH, y, 0.405]}
+              categoryBlock={item.key === 'category'}
             />
           );
         }),

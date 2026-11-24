@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import TWABoardHousing from './components/TWABoardHousing';
-import { emptyFeed, getMockFeed } from './data/mockFeed';
+import { emptyFeed, getAmbientEntry, getMockFeed } from './data/mockFeed';
 import { muteSound, unmuteSound } from './utils/soundEngine';
 
 export default function App() {
@@ -12,6 +12,23 @@ export default function App() {
   useEffect(() => {
     const frame = requestAnimationFrame(() => setEntries(getMockFeed(0)));
     return () => cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    let timer = 0;
+    const scheduleNextFlip = () => {
+      timer = window.setTimeout(() => {
+        setEntries((current) => {
+          const index = Math.floor(Math.random() * current.length);
+          const next = getAmbientEntry(current.filter((_, entryIndex) => entryIndex !== index).map(({ code }) => code));
+          return current.map((entry, entryIndex) => entryIndex === index ? next : entry);
+        });
+        scheduleNextFlip();
+      }, 4000 + Math.random() * 41000);
+    };
+
+    scheduleNextFlip();
+    return () => window.clearTimeout(timer);
   }, []);
 
   const refreshFeed = () => {
@@ -88,19 +105,16 @@ export default function App() {
           >
             <div className="mb-5 flex items-center justify-between border-b border-[#656b61]/20 pb-3">
               <span className="text-[9px] font-semibold uppercase tracking-[0.24em] text-[#7d786b]">
-                Commitment / {selectedEntry.code.trim()}
-              </span>
-              <span className="text-[9px] uppercase tracking-[0.18em] text-[#9b2638]">
-                {selectedEntry.category}
+                {selectedIndex !== null && selectedIndex < 6 ? 'Departure' : 'Arrival'} / {selectedEntry.code.trim()}
               </span>
             </div>
             <h2 id="inspection-title" className="font-serif text-2xl leading-tight tracking-wide">
-              {selectedEntry.target.trim()}
+              {selectedEntry.destination.trim()}
             </h2>
             <dl className="my-5 grid grid-cols-2 gap-4 border-y border-[#656b61]/15 py-4">
               <div>
-                <dt className="mb-1 text-[9px] uppercase tracking-[0.2em] text-[#828073]">Region</dt>
-                <dd className="text-xs font-medium tracking-[0.12em]">{selectedEntry.region.trim()}</dd>
+                <dt className="mb-1 text-[9px] uppercase tracking-[0.2em] text-[#828073]">Gate</dt>
+                <dd className="text-xs font-medium tracking-[0.12em]">{selectedEntry.gate.trim()}</dd>
               </div>
               <div>
                 <dt className="mb-1 text-[9px] uppercase tracking-[0.2em] text-[#828073]">Target year</dt>

@@ -1,41 +1,54 @@
 import { useState } from 'react';
 import { Text } from '@react-three/drei';
 import SplitFlapChar from './SplitFlapChar';
-import { CATEGORY_COLORS, type BoardEntry } from '../data/mockFeed';
+import type { BoardEntry } from '../data/mockFeed';
 
 const CELL_PITCH = 0.196;
-const CELL_COUNT = 46;
+const CELL_COUNT = 40;
 const START_X = -((CELL_COUNT - 1) * CELL_PITCH) / 2;
-const FLAP_COLOR = '#292e32';
-const SPACER_COLOR = '#171b1f';
+const FLAP_COLOR = '#16171A';
+const STATUS_COLORS: Record<string, { background: string; foreground: string }> = {
+  'ON TRACK': { background: '#1B7A43', foreground: '#FFFFFF' },
+  BOARDING: { background: '#1B7A43', foreground: '#FFFFFF' },
+  'MINOR SLIP': { background: '#1B7A43', foreground: '#FFFFFF' },
+  REVIEWING: { background: '#D99B00', foreground: '#111111' },
+  SLIPPED: { background: '#D99B00', foreground: '#111111' },
+  DELAYED: { background: '#D9531E', foreground: '#FFFFFF' },
+  REROUTED: { background: '#D9531E', foreground: '#FFFFFF' },
+  CANCELLED: { background: '#C81E2B', foreground: '#FFFFFF' },
+  ABANDONED: { background: '#C81E2B', foreground: '#FFFFFF' },
+};
 
 interface BoardRowProps {
   entry: BoardEntry;
   index: number;
+  x: number;
   y: number;
   selected: boolean;
   onSelect: () => void;
 }
 
-export default function BoardRow({ entry, index, y, selected, onSelect }: BoardRowProps) {
+export default function BoardRow({ entry, index, x, y, selected, onSelect }: BoardRowProps) {
   const [hovered, setHovered] = useState(false);
-  let cellIndex = 0;
+  const statusColor = STATUS_COLORS[entry.status.trim()] ?? {
+    background: FLAP_COLOR,
+    foreground: '#F8F9FA',
+  };
   const items = [
-    { key: 'category', value: ' ', color: CATEGORY_COLORS[entry.category] },
-    { key: 'category-code-gap', value: ' ', color: SPACER_COLOR },
-    { key: 'code', value: entry.code, color: FLAP_COLOR },
-    { key: 'code-target-gap', value: ' ', color: SPACER_COLOR },
-    { key: 'target', value: entry.target, color: FLAP_COLOR },
-    { key: 'target-region-gap', value: ' ', color: SPACER_COLOR },
-    { key: 'region', value: entry.region, color: FLAP_COLOR },
-    { key: 'region-status-gap', value: ' ', color: SPACER_COLOR },
-    { key: 'status', value: entry.status, color: FLAP_COLOR },
+    { key: 'code', value: entry.code, color: FLAP_COLOR, textColor: '#F8F9FA' },
+    { key: 'code-destination-gap', value: ' ', color: FLAP_COLOR, textColor: '#F8F9FA' },
+    { key: 'destination', value: entry.destination, color: FLAP_COLOR, textColor: '#F8F9FA' },
+    { key: 'destination-gate-gap', value: ' ', color: FLAP_COLOR, textColor: '#F8F9FA' },
+    { key: 'gate', value: entry.gate, color: FLAP_COLOR, textColor: '#F8F9FA' },
+    { key: 'gate-status-gap', value: ' ', color: FLAP_COLOR, textColor: '#F8F9FA' },
+    { key: 'status', value: entry.status, color: statusColor.background, textColor: statusColor.foreground },
   ];
+  let cellIndex = 0;
 
   return (
     <group>
       <mesh
-        position={[0, y, 0.389]}
+        position={[x, y, 0.67]}
         onPointerOver={(event) => {
           event.stopPropagation();
           setHovered(true);
@@ -50,11 +63,11 @@ export default function BoardRow({ entry, index, y, selected, onSelect }: BoardR
           onSelect();
         }}
       >
-        <planeGeometry args={[9.9, 0.4]} />
+        <planeGeometry args={[7.95, 0.39]} />
         <meshBasicMaterial
-          color={selected ? '#e5c28a' : '#f5ead7'}
+          color={selected ? '#D7DEE5' : '#FFFFFF'}
           transparent
-          opacity={selected ? 0.16 : hovered ? 0.1 : 0}
+          opacity={selected ? 0.12 : hovered ? 0.065 : 0}
           depthWrite={false}
           toneMapped={false}
         />
@@ -69,9 +82,9 @@ export default function BoardRow({ entry, index, y, selected, onSelect }: BoardR
               id={`row-${index}-cell-${currentIndex}`}
               character={character}
               color={item.color}
-              delay={index * 0.055 + currentIndex * 0.012}
-              position={[START_X + currentIndex * CELL_PITCH, y, 0.405]}
-              categoryBlock={item.key === 'category'}
+              textColor={item.textColor}
+              delay={index * 0.035 + currentIndex * 0.008}
+              position={[x + START_X + currentIndex * CELL_PITCH, y, 0.69]}
             />
           );
         }),
@@ -83,15 +96,16 @@ export default function BoardRow({ entry, index, y, selected, onSelect }: BoardR
 interface ColumnHeadingProps {
   children: string;
   x: number;
+  y: number;
 }
 
-export function ColumnHeading({ children, x }: ColumnHeadingProps) {
+export function ColumnHeading({ children, x, y }: ColumnHeadingProps) {
   return (
     <Text
-      position={[x, 0, 0]}
-      fontSize={0.11}
-      letterSpacing={0.08}
-      color="#e8dfd1"
+      position={[x, y, 0.7]}
+      fontSize={0.09}
+      letterSpacing={0.035}
+      color="#AAB2BB"
       anchorX="center"
       anchorY="middle"
     >
@@ -99,3 +113,10 @@ export function ColumnHeading({ children, x }: ColumnHeadingProps) {
     </Text>
   );
 }
+
+export const BOARD_COLUMN_CENTERS = [
+  START_X + 2 * CELL_PITCH,
+  START_X + 14.5 * CELL_PITCH,
+  START_X + 26.5 * CELL_PITCH,
+  START_X + 34.5 * CELL_PITCH,
+];

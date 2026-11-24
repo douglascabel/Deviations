@@ -1,26 +1,67 @@
 import { useEffect, useState } from 'react';
 import TWABoardHousing from './components/TWABoardHousing';
-import { emptyFeed, getAmbientEntry, getMockFeed } from './data/mockFeed';
+import {
+  emptyFeed,
+  FEED_TTL,
+  getAmbientEntry,
+  getCachedArticleFeed,
+  loadArticleFeed,
+  refreshArticleFeed,
+  selectBoardEntries,
+  type BoardEntry,
+} from './data/feedService';
 import { muteSound, unmuteSound } from './utils/soundEngine';
 
 export default function App() {
   const [entries, setEntries] = useState(emptyFeed);
+  const [feedPool, setFeedPool] = useState<BoardEntry[]>([]);
   const [feedVersion, setFeedVersion] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [isMuted, setIsMuted] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [feedError, setFeedError] = useState('');
 
   useEffect(() => {
-    const frame = requestAnimationFrame(() => setEntries(getMockFeed(0)));
-    return () => cancelAnimationFrame(frame);
+    let active = true;
+    const cachedFeed = getCachedArticleFeed();
+    if (cachedFeed.length > 0) {
+      setFeedPool(cachedFeed);
+      setEntries(selectBoardEntries(cachedFeed));
+    }
+    const load = async (force = false) => {
+      try {
+        const feed = force ? await refreshArticleFeed() : await loadArticleFeed();
+        if (!active) return;
+        setFeedPool(feed);
+        setEntries(selectBoardEntries(feed));
+        setFeedError('');
+      } catch (error) {
+        if (!active) return;
+        setFeedError(error instanceof Error ? error.message : 'Unable to refresh the article feed.');
+      }
+    };
+    void load();
+    const timer = window.setInterval(() => void load(true), FEED_TTL);
+    const onFocus = () => void load();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   useEffect(() => {
+    if (feedPool.length === 0) return;
     let timer = 0;
     const scheduleNextFlip = () => {
       timer = window.setTimeout(() => {
         setEntries((current) => {
           const index = Math.floor(Math.random() * current.length);
-          const next = getAmbientEntry(current.filter((_, entryIndex) => entryIndex !== index).map(({ code }) => code));
+          const next = getAmbientEntry(
+            feedPool,
+            current.filter((_, entryIndex) => entryIndex !== index).map(({ flight }) => flight),
+          );
           return current.map((entry, entryIndex) => entryIndex === index ? next : entry);
         });
         scheduleNextFlip();
@@ -29,13 +70,24 @@ export default function App() {
 
     scheduleNextFlip();
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [feedPool]);
 
-  const refreshFeed = () => {
-    const nextVersion = feedVersion + 1;
-    setFeedVersion(nextVersion);
-    setEntries(getMockFeed(nextVersion));
-    setSelectedIndex(null);
+  const refreshFeed = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      const feed = await refreshArticleFeed();
+      const nextVersion = feedVersion + 1;
+      setFeedPool(feed);
+      setFeedVersion(nextVersion);
+      setEntries(selectBoardEntries(feed, nextVersion % feed.length));
+      setSelectedIndex(null);
+      setFeedError('');
+    } catch (error) {
+      setFeedError(error instanceof Error ? error.message : 'Unable to refresh the article feed.');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const selectedEntry = selectedIndex === null ? null : entries[selectedIndex];
@@ -69,9 +121,13 @@ export default function App() {
           >
             {isMuted ? 'Sound off' : 'Sound on'}
           </button>
-          <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-[#6d756c]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#709776] shadow-[0_0_10px_#709776]" />
-            Feed / {String(feedVersion + 1).padStart(2, '0')}
+          <span
+            role={feedError ? 'status' : undefined}
+            title={feedError || undefined}
+            className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] ${feedError ? 'text-[#9b2638]' : 'text-[#6d756c]'}`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${feedError ? 'bg-[#9b2638]' : 'bg-[#709776]'} shadow-[0_0_10px_#709776]`} />
+            {feedError ? 'Feed unavailable' : `Feed / ${String(feedVersion + 1).padStart(2, '0')}`}
           </span>
         </div>
       </header>
@@ -85,13 +141,15 @@ export default function App() {
           />
         </div>
         <div className="pointer-events-none absolute bottom-7 left-6 z-10 hidden max-w-48 text-[10px] leading-relaxed tracking-[0.12em] text-[#777263] sm:block">
-          ALL TIMES ARE LOCAL<br />
-          TO THE PRESENT MOMENT
+          PUBLISHED TIME<br />
+          RELATIVE TO NOW
         </div>
         <button
           type="button"
           onClick={refreshFeed}
-          className="absolute bottom-7 right-6 z-10 inline-flex items-center gap-3 border border-[#596058]/35 bg-[#eee8dc]/80 px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#303833] shadow-[0_8px_24px_rgba(70,60,44,0.12)] backdrop-blur transition duration-200 hover:-translate-y-0.5 hover:border-[#596058]/70 hover:bg-[#f8f4ec] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#596058] sm:right-10 sm:bottom-9"
+          disabled={isRefreshing}
+          aria-busy={isRefreshing}
+          className="absolute bottom-7 right-6 z-10 inline-flex items-center gap-3 border border-[#596058]/35 bg-[#eee8dc]/80 px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#303833] shadow-[0_8px_24px_rgba(70,60,44,0.12)] backdrop-blur transition duration-200 hover:-translate-y-0.5 hover:border-[#596058]/70 hover:bg-[#f8f4ec] disabled:cursor-wait disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#596058] sm:right-10 sm:bottom-9"
         >
           <span className="text-sm leading-none" aria-hidden="true">↻</span>
           Refresh Feed
@@ -105,20 +163,20 @@ export default function App() {
           >
             <div className="mb-5 flex items-center justify-between border-b border-[#656b61]/20 pb-3">
               <span className="text-[9px] font-semibold uppercase tracking-[0.24em] text-[#7d786b]">
-                {selectedIndex !== null && selectedIndex < 6 ? 'Departure' : 'Arrival'} / {selectedEntry.code.trim()}
+                {selectedEntry.source || 'News'} / {selectedEntry.flight.trim()}
               </span>
             </div>
             <h2 id="inspection-title" className="font-serif text-2xl leading-tight tracking-wide">
-              {selectedEntry.destination.trim()}
+              {selectedEntry.title || selectedEntry.headline.trim()}
             </h2>
             <dl className="my-5 grid grid-cols-2 gap-4 border-y border-[#656b61]/15 py-4">
               <div>
-                <dt className="mb-1 text-[9px] uppercase tracking-[0.2em] text-[#828073]">Gate</dt>
-                <dd className="text-xs font-medium tracking-[0.12em]">{selectedEntry.gate.trim()}</dd>
+                <dt className="mb-1 text-[9px] uppercase tracking-[0.2em] text-[#828073]">Published</dt>
+                <dd className="text-xs font-medium tracking-[0.12em]">{selectedEntry.time.trim()}</dd>
               </div>
               <div>
-                <dt className="mb-1 text-[9px] uppercase tracking-[0.2em] text-[#828073]">Target year</dt>
-                <dd className="text-xs font-medium tracking-[0.12em]">{selectedEntry.targetYear}</dd>
+                <dt className="mb-1 text-[9px] uppercase tracking-[0.2em] text-[#828073]">Source</dt>
+                <dd className="text-xs font-medium tracking-[0.12em]">{selectedEntry.source}</dd>
               </div>
               <div className="col-span-2">
                 <dt className="mb-1 text-[9px] uppercase tracking-[0.2em] text-[#828073]">Board status</dt>

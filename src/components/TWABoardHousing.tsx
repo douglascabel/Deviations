@@ -5,7 +5,7 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import BoardRow, { BOARD_COLUMN_CENTERS, ColumnHeading } from './BoardRow';
 import { SplitFlapBatch } from './SplitFlapChar';
-import type { BoardEntry } from '../data/mockFeed';
+import type { BoardEntry } from '../data/feedService';
 
 interface TWABoardHousingProps {
   entries: BoardEntry[];
@@ -17,6 +17,34 @@ const BOARD_Y = 2.12;
 const BOARD_SIDE_OFFSET = 4.12;
 const FIRST_ROW_Y = 1.08;
 const ROW_PITCH = 0.39;
+const FLOOR_Y = -5.68;
+
+function makeCarpetTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Unable to create the lounge carpet texture.');
+
+  context.fillStyle = '#A31D2B';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  for (let index = 0; index < 14000; index += 1) {
+    const x = (index * 97) % canvas.width;
+    const y = (index * 193) % canvas.height;
+    const lightness = 20 + ((index * 17) % 24);
+    context.fillStyle = `rgba(${150 + lightness}, ${18 + Math.floor(lightness / 5)}, ${27 + Math.floor(lightness / 4)}, 0.24)`;
+    context.fillRect(x, y, 2, 1);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(18, 12);
+  texture.anisotropy = 8;
+  return texture;
+}
+
+const carpetTexture = makeCarpetTexture();
 
 function makePillGeometry(width: number, height: number, depth: number): THREE.ExtrudeGeometry {
   const radius = height / 2;
@@ -51,7 +79,7 @@ canopyShape.bezierCurveTo(-7.1, 8.82, -10.9, 7.72, -12, 5.85);
 canopyShape.closePath();
 
 const canopyGeometry = new THREE.ExtrudeGeometry(canopyShape, {
-  depth: 0.42,
+  depth: 18,
   bevelEnabled: true,
   bevelSegments: 6,
   bevelSize: 0.16,
@@ -95,16 +123,12 @@ function PanoramicWindows() {
         <planeGeometry args={[48, 28]} />
         <meshBasicMaterial color="#C9DDE4" toneMapped={false} />
       </mesh>
-      <mesh position={[0, -5.24, -13]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[52, 20]} />
-        <meshStandardMaterial color="#B9C9C7" roughness={0.92} />
-      </mesh>
       <mesh position={[0, -4.8, -8.95]}>
-        <planeGeometry args={[52, 0.18]} />
-        <meshBasicMaterial color="#899B9C" />
+        <planeGeometry args={[52, 0.5]} />
+        <meshStandardMaterial color="#B9B2A8" roughness={0.86} />
       </mesh>
       {bays.map(({ x, z, yaw }, index) => (
-        <group key={index} position={[x, 1.05, z]} rotation={[0, yaw, 0]}>
+        <group key={index} position={[x, 1.05, z]} rotation={[0.055, yaw, 0]}>
           <mesh>
             <planeGeometry args={[3.63, 12.2]} />
             <meshPhysicalMaterial
@@ -143,81 +167,51 @@ function PanoramicWindows() {
 
 function VaultedCanopy() {
   return (
-    <mesh geometry={canopyGeometry} position={[0, 0, -0.25]} receiveShadow>
+    <mesh geometry={canopyGeometry} position={[0, 0, -8.5]} receiveShadow>
       <meshPhysicalMaterial color="#F1EFE9" roughness={0.72} metalness={0.015} side={THREE.DoubleSide} />
     </mesh>
   );
 }
 
-function SunkenLounge() {
-  const tablePositions = [
-    [-2.4, 1.2],
-    [2.4, 1.2],
-  ] as const;
-  const stoolPositions = [
-    [-1.25, 3.15],
-    [1.25, 3.15],
-  ] as const;
-
+function LoungeIsland({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
+  const seatAngles = Array.from({ length: 7 }, (_, index) => Math.PI * 1.08 + index * Math.PI * 0.14);
   return (
-    <group>
-      <mesh position={[0, -5.22, 2.15]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <ringGeometry args={[3.96, 30, 96]} />
-        <meshStandardMaterial color="#D5D6D1" roughness={0.9} />
+    <group position={position} rotation={[0, rotation, 0]}>
+      <mesh position={[0, 0.18, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[2.32, 2.25, 0.36, 64]} />
+        <meshPhysicalMaterial color="#811722" roughness={0.5} clearcoat={0.16} />
       </mesh>
-      <mesh position={[0, -5.78, 2.15]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[3.55, 96]} />
-        <meshStandardMaterial color="#B51922" roughness={0.94} />
+      <mesh position={[0, 0.43, 0]} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
+        <torusGeometry args={[1.77, 0.35, 20, 96, Math.PI * 1.78]} />
+        <meshPhysicalMaterial color="#C41F31" roughness={0.5} clearcoat={0.28} />
       </mesh>
-      <mesh position={[0, -5.35, 2.15]} receiveShadow>
-        <cylinderGeometry args={[3.85, 3.85, 0.86, 96, 1, true]} />
-        <meshPhysicalMaterial color="#F2F0EA" roughness={0.34} clearcoat={0.12} side={THREE.DoubleSide} />
-      </mesh>
-      <mesh position={[0, -4.91, 2.15]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <ringGeometry args={[3.58, 3.91, 96]} />
-        <meshPhysicalMaterial color="#F8F7F1" roughness={0.28} metalness={0.02} />
-      </mesh>
-      <mesh position={[0, -5.38, 2.15]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-        <torusGeometry args={[2.37, 0.39, 18, 96, Math.PI * 1.78]} />
-        <meshPhysicalMaterial color="#B51922" roughness={0.54} clearcoat={0.16} />
-      </mesh>
-      <mesh position={[0, -5.28, 2.15]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-        <torusGeometry args={[3.12, 0.13, 12, 96, Math.PI * 1.45]} />
-        <meshPhysicalMaterial color="#F7F6F0" roughness={0.25} clearcoat={0.3} />
-      </mesh>
-      {tablePositions.map(([x, z]) => (
-        <group key={`${x}-${z}`} position={[x, -5.23, z]}>
-          <mesh position={[0, -0.32, 0]} castShadow>
-            <cylinderGeometry args={[0.28, 0.36, 0.09, 32]} />
-            <meshPhysicalMaterial color="#F3F1EB" roughness={0.3} />
-          </mesh>
-          <mesh position={[0, 0.01, 0]} castShadow>
-            <cylinderGeometry args={[0.075, 0.12, 0.58, 20]} />
-            <meshPhysicalMaterial color="#F5F3ED" roughness={0.28} metalness={0.02} />
-          </mesh>
-          <mesh position={[0, 0.32, 0]} castShadow>
-            <cylinderGeometry args={[0.43, 0.43, 0.09, 40]} />
-            <meshPhysicalMaterial color="#FCFBF7" roughness={0.24} clearcoat={0.34} />
-          </mesh>
-        </group>
-      ))}
-      {stoolPositions.map(([x, z]) => (
-        <group key={`${x}-${z}`} position={[x, -5.36, z]}>
-          <mesh position={[0, -0.13, 0]} castShadow>
-            <cylinderGeometry args={[0.22, 0.3, 0.08, 32]} />
-            <meshStandardMaterial color="#F1EFE9" roughness={0.3} />
-          </mesh>
-          <mesh position={[0, 0.18, 0]} castShadow>
-            <cylinderGeometry args={[0.075, 0.12, 0.55, 20]} />
-            <meshStandardMaterial color="#F1EFE9" roughness={0.28} />
-          </mesh>
-          <mesh position={[0, 0.48, 0]} castShadow>
-            <cylinderGeometry args={[0.36, 0.36, 0.18, 32]} />
-            <meshPhysicalMaterial color="#B51922" roughness={0.56} />
-          </mesh>
-        </group>
+      {seatAngles.map((angle) => (
+        <mesh
+          key={angle}
+          position={[Math.sin(angle) * 1.82, 0.88, Math.cos(angle) * 1.82]}
+          rotation={[0, angle, 0]}
+          castShadow
+          receiveShadow
+        >
+          <boxGeometry args={[0.72, 0.66, 0.2]} />
+          <meshPhysicalMaterial color="#AA1A2A" roughness={0.48} clearcoat={0.25} />
+        </mesh>
       ))}
     </group>
+  );
+}
+
+function LoungeIslands() {
+  return (
+    <>
+      <mesh position={[0, FLOOR_Y, -1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[52, 34]} />
+        <meshStandardMaterial map={carpetTexture} roughness={0.96} />
+      </mesh>
+      <LoungeIsland position={[0, FLOOR_Y, 5.2]} rotation={0.08} />
+      <LoungeIsland position={[-6.1, FLOOR_Y, 0.7]} rotation={-0.18} />
+      <LoungeIsland position={[6.1, FLOOR_Y, -1.7]} rotation={0.2} />
+    </>
   );
 }
 
@@ -225,29 +219,28 @@ function SuspendedBoard({ entries, selectedIndex, onSelect }: TWABoardHousingPro
   return (
     <group position={[0, BOARD_Y, 0.3]}>
       <mesh geometry={boardHousingGeometry} position={[0, 0, -0.41]} castShadow receiveShadow>
-        <meshPhysicalMaterial color="#24262A" roughness={0.3} metalness={0.32} clearcoat={0.4} />
+        <meshPhysicalMaterial color="#111316" roughness={0.3} metalness={0.32} clearcoat={0.4} />
       </mesh>
       <mesh geometry={boardInsetGeometry} position={[0, 0, 0.38]}>
         <meshStandardMaterial color="#111316" roughness={0.76} metalness={0.08} />
       </mesh>
       <SplitFlapBatch>
+        <Text
+          position={[0, 1.96, 0.7]}
+          fontSize={0.265}
+          letterSpacing={0.13}
+          color="#F8F9FA"
+          anchorX="center"
+          anchorY="middle"
+        >
+          DEPARTURES
+        </Text>
         {[-1, 1].map((direction) => {
           const sideIndex = direction < 0 ? 0 : 1;
           const sideCenter = direction * BOARD_SIDE_OFFSET;
-          const rowHeading = direction < 0 ? 'DEPARTURES' : 'ARRIVALS';
           return (
-            <group key={rowHeading}>
-              <Text
-                position={[sideCenter, 1.96, 0.7]}
-                fontSize={0.265}
-                letterSpacing={0.13}
-                color="#F8F9FA"
-                anchorX="center"
-                anchorY="middle"
-              >
-                {rowHeading}
-              </Text>
-              {['CODE', 'DESTINATION', 'GATE', 'STATUS'].map((label, columnIndex) => (
+            <group key={sideIndex}>
+              {['FLIGHT', 'ORIGINATION', 'TIME', 'STATUS'].map((label, columnIndex) => (
                 <ColumnHeading
                   key={label}
                   x={sideCenter + BOARD_COLUMN_CENTERS[columnIndex]}
@@ -378,13 +371,13 @@ function Scene({ entries, selectedIndex, onSelect }: TWABoardHousingProps) {
       <VaultedCanopy />
       <SuspensionCables />
       <SuspendedBoard entries={entries} selectedIndex={selectedIndex} onSelect={onSelect} />
-      <SunkenLounge />
+      <LoungeIslands />
       <ContactShadows
-        position={[0, -5.18, 0]}
-        opacity={0.27}
-        scale={18}
-        blur={2.8}
-        far={5}
+        position={[0, FLOOR_Y + 0.015, 0]}
+        opacity={0.36}
+        scale={24}
+        blur={3.2}
+        far={6}
         resolution={512}
         color="#4C3532"
       />

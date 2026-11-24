@@ -13,7 +13,7 @@ const MAX_CELLS = 12 * 42;
 const ATLAS_COLUMNS = 8;
 const ATLAS_ROWS = 8;
 const CHARACTER_SPOOL = Array.from(' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-./:');
-const FLIP_THRESHOLD = 0.85;
+const FLIP_THRESHOLD = 0.5;
 const GLYPHS = CHARACTER_SPOOL.join('');
 const FLAP_COLOR = '#16171A';
 const FLAP_TEXT_COLOR = '#F8F9FA';
@@ -21,6 +21,7 @@ const FLAP_TEXT_COLOR = '#F8F9FA';
 interface SpoolState {
   character: string;
   color: string;
+  textColor: string;
 }
 
 interface CellDescriptor {
@@ -29,6 +30,7 @@ interface CellDescriptor {
   textColor: string;
   targetCharacter: string;
   targetColor: string;
+  targetTextColor: string;
   position: [number, number, number];
   pending: SpoolState[];
   nextStepAt: number;
@@ -36,8 +38,10 @@ interface CellDescriptor {
   active: boolean;
   outgoingCharacter: string;
   outgoingColor: string;
+  outgoingTextColor: string;
   incomingCharacter: string;
   incomingColor: string;
+  incomingTextColor: string;
   stepStartAt: number;
   soundPlayed: boolean;
 }
@@ -183,15 +187,18 @@ const localCreaseOffset = new THREE.Matrix4().makeTranslation(0, 0, FLAP_DEPTH /
 const instanceMatrixHelper = new THREE.Matrix4();
 const instanceColor = new THREE.Color();
 
-function spoolFor(color: string): SpoolState[] {
-  return CHARACTER_SPOOL.map((character) => ({ character, color }));
+function spoolFor(color: string, textColor: string): SpoolState[] {
+  return CHARACTER_SPOOL.map((character) => ({ character, color, textColor }));
 }
 
 function forwardSteps(current: SpoolState, target: SpoolState): SpoolState[] {
-  const spool = spoolFor(target.color);
+  const spool = spoolFor(target.color, target.textColor);
   const from = spool.findIndex((token) => token.character === current.character);
   const to = spool.findIndex((token) => token.character === target.character);
-  if (from < 0 || to < 0 || from === to) return [];
+  if (from < 0 || to < 0) return [target];
+  if (from === to) {
+    return current.color === target.color && current.textColor === target.textColor ? [] : [target];
+  }
 
   const steps: SpoolState[] = [];
   for (let index = (from + 1) % spool.length; index !== to; index = (index + 1) % spool.length) {
@@ -215,10 +222,11 @@ function speedForSlot(id: string): number {
 function flapAngle(progress: number): number {
   if (progress < FLIP_THRESHOLD) {
     const fallProgress = progress / FLIP_THRESHOLD;
-    return Math.PI * fallProgress * fallProgress;
+    return -(Math.PI / 2) * fallProgress * fallProgress;
   }
   const settleProgress = (progress - FLIP_THRESHOLD) / (1 - FLIP_THRESHOLD);
-  return Math.PI + Math.sin(settleProgress * Math.PI * 3) * 0.025 * (1 - settleProgress);
+  const settleEase = 1 - (1 - settleProgress) ** 2;
+  return -Math.PI / 2 - (Math.PI / 2) * settleEase;
 }
 
 function writeGlyph(geometry: THREE.PlaneGeometry, instance: number, character: string): void {
@@ -251,14 +259,15 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
       const character = normalizeCharacter(input.character);
       const previous = cells.current.get(id);
       if (!previous) {
-        const initial = { character: ' ', color: input.color };
-        const target = { character, color: input.color };
+        const initial = { character: ' ', color: input.color, textColor: input.textColor };
+        const target = { character, color: input.color, textColor: input.textColor };
         cells.current.set(id, {
           character: initial.character,
           color: initial.color,
           textColor: input.textColor,
           targetCharacter: target.character,
           targetColor: target.color,
+          targetTextColor: target.textColor,
           position: input.position,
           pending: forwardSteps(initial, target),
           nextStepAt: now + Math.max(0, input.delay),
@@ -266,8 +275,10 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
           active: false,
           outgoingCharacter: initial.character,
           outgoingColor: initial.color,
+          outgoingTextColor: initial.textColor,
           incomingCharacter: initial.character,
           incomingColor: initial.color,
+          incomingTextColor: initial.textColor,
           stepStartAt: 0,
           soundPlayed: false,
         });
@@ -277,24 +288,24 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
 
       const target = { character, color: input.color };
       const positionChanged = previous.position.some((coordinate, index) => coordinate !== input.position[index]);
-      const targetChanged = previous.targetCharacter !== target.character;
-      const visualChanged = previous.targetColor !== input.color || previous.textColor !== input.textColor;
-      if (!targetChanged) {
-        previous.color = input.color;
-        if (previous.active) {
-          previous.outgoingColor = input.color;
-          previous.incomingColor = input.color;
-        }
-      }
-      previous.textColor = input.textColor;
+      const targetChanged =
+        previous.targetCharacter !== target.character ||
+        previous.targetColor !== target.color ||
+        previous.targetTextColor !== input.textColor;
+      const visualChanged = previous.textColor !== input.textColor;
       previous.position = input.position;
       previous.targetCharacter = target.character;
       previous.targetColor = target.color;
+      previous.targetTextColor = input.textColor;
       if (targetChanged) {
         const origin = previous.active
-          ? { character: previous.incomingCharacter, color: previous.incomingColor }
-          : { character: previous.character, color: previous.color };
-        previous.pending = forwardSteps(origin, target);
+          ? {
+              character: previous.incomingCharacter,
+              color: previous.incomingColor,
+              textColor: previous.incomingTextColor,
+            }
+          : { character: previous.character, color: previous.color, textColor: previous.textColor };
+        previous.pending = forwardSteps(origin, { ...target, textColor: input.textColor });
         if (!previous.active) previous.nextStepAt = now + Math.max(0, input.delay);
         dirty.current = true;
       } else if (positionChanged || visualChanged) {
@@ -344,8 +355,10 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
         const next = cell.pending.shift()!;
         cell.outgoingCharacter = cell.character;
         cell.outgoingColor = cell.color;
+        cell.outgoingTextColor = cell.textColor;
         cell.incomingCharacter = next.character;
         cell.incomingColor = next.color;
+        cell.incomingTextColor = next.textColor;
         cell.stepStartAt = now;
         cell.active = true;
         cell.soundPlayed = false;
@@ -361,6 +374,7 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
         if (progress >= 1) {
           cell.character = cell.incomingCharacter;
           cell.color = cell.incomingColor;
+          cell.textColor = cell.incomingTextColor;
           cell.active = false;
           cell.nextStepAt = now;
         }
@@ -371,7 +385,13 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
       const incomingCharacter = active ? cell.incomingCharacter : cell.character;
       const outgoingColor = active ? cell.outgoingColor : cell.color;
       const incomingColor = active ? cell.incomingColor : cell.color;
-      const angle = active ? flapAngle(progress) : Math.PI;
+      const outgoingTextColor = active ? cell.outgoingTextColor : cell.textColor;
+      const incomingTextColor = active ? cell.incomingTextColor : cell.textColor;
+      const midpointPassed = active && progress >= FLIP_THRESHOLD;
+      const restingCharacter = midpointPassed ? incomingCharacter : outgoingCharacter;
+      const restingColor = midpointPassed ? incomingColor : outgoingColor;
+      const restingTextColor = midpointPassed ? incomingTextColor : outgoingTextColor;
+      const angle = active ? flapAngle(progress) : -Math.PI;
       hasWork ||= active || cell.pending.length > 0 || now < cell.nextStepAt;
 
       matrixHelper.position.set(
@@ -401,21 +421,22 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
       instanceMatrixHelper.multiplyMatrices(matrixHelper.matrix, localBackGlyphOffset);
       movingBackGlyphMesh.setMatrixAt(index, instanceMatrixHelper);
 
-      writeGlyph(topStaticGlyphGeometry, index, incomingCharacter);
-      writeGlyph(bottomStaticGlyphGeometry, index, outgoingCharacter);
+      writeGlyph(topStaticGlyphGeometry, index, restingCharacter);
+      writeGlyph(bottomStaticGlyphGeometry, index, restingCharacter);
       writeGlyph(movingFrontGlyphGeometry, index, outgoingCharacter);
       writeGlyph(movingBackGlyphGeometry, index, incomingCharacter);
 
-      instanceColor.set(incomingColor);
+      instanceColor.set(restingColor);
       topStaticMesh.setColorAt(index, instanceColor);
-      instanceColor.set(outgoingColor);
       bottomStaticMesh.setColorAt(index, instanceColor);
-      instanceColor.set(active && progress < FLIP_THRESHOLD ? outgoingColor : incomingColor);
+      instanceColor.set(active && !midpointPassed ? outgoingColor : incomingColor);
       flapMesh.setColorAt(index, instanceColor);
-      instanceColor.set(cell.textColor);
+      instanceColor.set(restingTextColor);
       topStaticGlyphMesh.setColorAt(index, instanceColor);
       bottomStaticGlyphMesh.setColorAt(index, instanceColor);
+      instanceColor.set(outgoingTextColor);
       movingFrontGlyphMesh.setColorAt(index, instanceColor);
+      instanceColor.set(incomingTextColor);
       movingBackGlyphMesh.setColorAt(index, instanceColor);
       index += 1;
     }

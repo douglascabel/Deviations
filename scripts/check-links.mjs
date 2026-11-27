@@ -12,14 +12,17 @@ for (const url of urls) {
       headers: { 'user-agent': 'Mozilla/5.0 (link check)' },
       signal: AbortSignal.timeout(20_000),
     });
+    // Some official sites refuse automated clients; that says nothing about whether the page exists.
+    const blocked = [401, 403, 429].includes(response.status);
     const ok = response.status < 400;
-    if (!ok) failures += 1;
-    console.log(`${ok ? 'ok  ' : 'FAIL'} ${response.status} ${url}${response.url !== url ? ` -> ${response.url}` : ''}`);
+    if (!ok && !blocked) failures += 1;
+    const label = ok ? 'ok  ' : blocked ? 'BOT?' : 'FAIL';
+    console.log(`${label} ${response.status} ${url}${response.url !== url ? ` -> ${response.url}` : ''}`);
   } catch (error) {
     failures += 1;
     console.log(`FAIL ---  ${url} (${error instanceof Error ? error.message : error})`);
   }
 }
 
-console.log(`\n${urls.length - failures}/${urls.length} links reachable.`);
+console.log(`\n${failures} broken of ${urls.length} links (BOT? = site refused an automated check; verify by hand).`);
 process.exitCode = failures > 0 ? 1 : 0;

@@ -25,6 +25,8 @@ npm run preview
 
 The static site is written to `dist/`. Run `npm run check-links` to verify that every official source link still resolves.
 
+`.github/workflows/daily-board-check.yml` replaces the old daily RSS sync. It runs every day at 05:17 UTC, on demand, and on every change to the content. It builds the site and checks the source links, failing if any link is broken. It never commits to the repository: the 24-hour rotation happens in the browser.
+
 ## Architecture
 
 ### Content

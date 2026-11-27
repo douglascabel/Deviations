@@ -1,0 +1,57 @@
+name: Daily board check
+
+# Replaces the old daily RSS sync. The board's 24-hour rotation now runs in the browser
+# (src/data/governanceService.ts), so nothing needs to be committed. This job verifies, once a
+# day and on every change to the content, that the site still builds and that every official
+# source link in the satirical database still resolves.
+
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'scripts/check-links.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/daily-board-check.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'scripts/check-links.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/daily-board-check.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-board-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  links:
+    name: Official source links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Fails the run (and notifies the repository owner) if any source link stops resolving.
+      - run: npm run check-links

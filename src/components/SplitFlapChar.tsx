@@ -410,7 +410,8 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
     for (const mesh of meshes) mesh!.count = count;
     let index = 0;
     let hasWork = false;
-    let turning = 0;
+    let turningLeft = 0;
+    let turningRight = 0;
 
     for (const cell of cells.current.values()) {
       // Advance on wall-clock time, not frame count: if frames are slow (or the tab was hidden),
@@ -442,7 +443,8 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
       let back = cell.current;
 
       if (cell.active) {
-        turning += 1;
+        if (cell.position[0] < 0) turningLeft += 1;
+        else turningRight += 1;
         const t = Math.min((now - cell.stepStartAt) / cell.stepDuration, 1);
         const pan = THREE.MathUtils.clamp(cell.position[0] / 8, -1, 1);
         if (!cell.released) {
@@ -486,7 +488,7 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
       geometry.attributes.aGlyph.needsUpdate = true;
     }
     for (const mesh of meshes) mesh!.instanceMatrix.needsUpdate = true;
-    setMechanismActivity(turning);
+    setMechanismActivity(turningLeft, turningRight);
     dirty.current = hasWork;
   });
 

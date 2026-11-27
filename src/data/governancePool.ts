@@ -66,7 +66,7 @@ export const GOVERNANCE_POOL: GovernanceItem[] = [
     statuses: ["DRAFTING", "CONVENING", "PLEDGED"],
     dossier: "Supervisors will voluntarily test whether banks could withstand scenarios that supervisors have voluntarily agreed to consider. Results will be summarised, not published.",
     sourceLabel: "BIS - Basel Committee on Banking Supervision",
-    sourceUrl: "https://www.bis.org/bcbs/",
+    sourceUrl: "https://www.bis.org/committees/bcbs/overview",
   },
   {
     id: "bcbs-pillar3-climate",
@@ -79,7 +79,7 @@ export const GOVERNANCE_POOL: GovernanceItem[] = [
     statuses: ["CONVENING", "DRAFTING", "PLEDGED"],
     dossier: "Optional disclosure templates for climate-related risk will be consulted on, revised in light of the consultation, and then consulted on again.",
     sourceLabel: "BIS - Basel Committee on Banking Supervision",
-    sourceUrl: "https://www.bis.org/bcbs/",
+    sourceUrl: "https://www.bis.org/committees/bcbs/overview",
   },
   {
     id: "ncqg-successor",
@@ -157,7 +157,7 @@ export const GOVERNANCE_POOL: GovernanceItem[] = [
     statuses: ["DRAFTING", "PLEDGED", "CONVENING"],
     dossier: "Eligible emissions units will be defined by a technical body that will advise a Council that will take note of the advice.",
     sourceLabel: "ICAO - CORSIA",
-    sourceUrl: "https://www.icao.int/environmental-protection/CORSIA/Pages/default.aspx",
+    sourceUrl: "https://www.icao.int/CORSIA",
   },
   {
     id: "oecd-pillar-two-topup",
@@ -287,7 +287,7 @@ export const GOVERNANCE_POOL: GovernanceItem[] = [
     statuses: ["PLEDGED", "DRAFTING", "SIGNED"],
     dossier: "Leaders will reaffirm the commitments of an earlier declaration and welcome the declaration that preceded it. Reporting will be encouraged.",
     sourceLabel: "Glasgow Leaders Declaration on Forests",
-    sourceUrl: "https://ukcop26.org/glasgow-leaders-declaration-on-forests-and-land-use/",
+    sourceUrl: "https://webarchive.nationalarchives.gov.uk/ukgwa/20230401054904/https://ukcop26.org/glasgow-leaders-declaration-on-forests-and-land-use/",
   },
   {
     id: "gcf-top-up",
@@ -366,7 +366,7 @@ export const GOVERNANCE_POOL: GovernanceItem[] = [
     dossier: "None of the twenty targets was fully achieved. A successor framework was adopted, with targets for the targets of the successor framework.",
     slipped: "Originally 2020. Succeeded by 2030 framework. Review of review scheduled 2026.",
     sourceLabel: "CBD - Aichi Biodiversity Targets",
-    sourceUrl: "https://www.cbd.int/sp/targets/",
+    sourceUrl: "https://www.cbd.int/sp/targets",
   },
   {
     id: "paris-15c-trajectory",
@@ -478,7 +478,7 @@ export const GOVERNANCE_POOL: GovernanceItem[] = [
     dossier: "Implementation was agreed for one date, then another date, then a date to be confirmed by each jurisdiction at its own discretion.",
     slipped: "Originally 2022. Delayed to 2023. Re-baselined to 2025. Now 2027, jurisdiction permitting.",
     sourceLabel: "BIS - Basel Committee on Banking Supervision",
-    sourceUrl: "https://www.bis.org/bcbs/",
+    sourceUrl: "https://www.bis.org/committees/bcbs/overview",
   },
   {
     id: "tfcr-principles",
@@ -492,7 +492,7 @@ export const GOVERNANCE_POOL: GovernanceItem[] = [
     dossier: "Principles for effective management of climate-related financial risks were issued as principles. Their implementation will be reviewed once implemented.",
     slipped: "Originally 2025. Voluntary status confirmed. Review of voluntariness scheduled 2028.",
     sourceLabel: "BIS - Basel Committee on Banking Supervision",
-    sourceUrl: "https://www.bis.org/bcbs/",
+    sourceUrl: "https://www.bis.org/committees/bcbs/overview",
   },
   {
     id: "cbd-nbsap-updates",
@@ -520,7 +520,7 @@ export const GOVERNANCE_POOL: GovernanceItem[] = [
     dossier: "Leaders resolved to halt and reverse forest loss by 2030. Progress is assessed annually in a report that notes the assessment is ongoing.",
     slipped: "Originally 2030. Off track 2024. Refresh proposed. Assessment ongoing.",
     sourceLabel: "Glasgow Leaders Declaration on Forests",
-    sourceUrl: "https://ukcop26.org/glasgow-leaders-declaration-on-forests-and-land-use/",
+    sourceUrl: "https://webarchive.nationalarchives.gov.uk/ukgwa/20230401054904/https://ukcop26.org/glasgow-leaders-declaration-on-forests-and-land-use/",
   },
   {
     id: "bbnj-ratify",
@@ -604,7 +604,7 @@ export const GOVERNANCE_POOL: GovernanceItem[] = [
     dossier: "The pilot phase concluded with offsetting obligations to be calculated for a period that was shortened by the pandemic, then recalculated.",
     slipped: "Originally 2023. Baseline revised twice. Supply of eligible units under review.",
     sourceLabel: "ICAO - CORSIA",
-    sourceUrl: "https://www.icao.int/environmental-protection/CORSIA/Pages/default.aspx",
+    sourceUrl: "https://www.icao.int/CORSIA",
   },
   {
     id: "wto-agri-domestic",
@@ -688,7 +688,7 @@ export const GOVERNANCE_POOL: GovernanceItem[] = [
     dossier: "Updated national contributions were synthesised and found to leave a gap. The gap will be the subject of the next synthesis of the gap.",
     slipped: "Originally 2030. Gap noted 2022. Gap noted 2024. Gap noted annually.",
     sourceLabel: "UNEP - Emissions Gap Report",
-    sourceUrl: "https://www.unep.org/resources/emissions-gap-report-2024",
+    sourceUrl: "https://www.unep.org/en/publications/report/emissions-gap-report-2024",
   },
   {
     id: "adapt-finance-2025",

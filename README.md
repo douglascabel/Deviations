@@ -49,15 +49,29 @@ The static site is written to `dist/`. Run `npm run check-links` to verify that 
 - `layout.ts` defines one shared layout: floor plane, window-wall plan line, rake, and the shell surface function. Every element is placed against it, and a dev-time check rejects overlapping lounges or furniture that crosses the glass.
 - `Shell.tsx` builds the double-curved, winged vault as a parametric surface, with baked ambient occlusion, rounded concrete rims, a skylight seam and flared piers.
 - `GlassWall.tsx` builds the raked, faceted green-tinted curtain wall, whose top edge follows the shell, plus instanced mullions and transoms.
+- `SideWalls.tsx` closes both flanks of the hall. Each white sculpted wall rises to meet the shell and follows the rake of the glass. It has a cove at the floor joint, an upper balcony with a rounded parapet and red-carpeted deck, and an oval portal into a red-carpeted flight tube lit from its far end.
 - `Lounge.tsx` builds three sculpted lounge islands: an undercut white rim, a carpeted well, a continuous upholstered bench with sheen, a pedestal table and steps. It also lays the crimson carpet floor.
-- `Exterior.tsx` builds the gradient sky with sun glow, the apron with taxi markings, parked and taxiing jets, and a distant tower and hangars.
+- `Airliner.tsx` builds a complete four-engine, swept-wing jetliner of the early-1960s type:
+  - an upswept fuselage with a painted livery (cabin windows, windscreen, cheatline, doors, bare-metal belly; no airline marks);
+  - dihedral wings and both tailplanes, plus the fin;
+  - four nacelles on pylons with fan faces and exhaust cones;
+  - nose and main gear whose tyres sit exactly on the apron.
+- `Exterior.tsx` builds the gradient sky with sun glow, the apron with taxi markings, the parked and taxiing jets with soft ground shadows, and a distant tower and hangars.
 - `textures.ts` generates tileable procedural PBR maps (colour, normal, roughness) for concrete, carpet, upholstery and tarmac. There are no binary assets, and nothing is downloaded at runtime.
 - Rendering uses soft shadow maps and contact shadows, image-based lighting from code-generated light cards (no HDRI download), N8AO ambient occlusion, bloom, ACES Filmic tone mapping, SMAA and a vignette. `PerformanceMonitor` drops AO and resolution on slower GPUs.
 - `CameraControls` provides damped orbit and zoom within limits that keep the view inside the hall, and glides to a row when it's selected. Portrait screens get a wider lens.
 
 ### Sound (`src/utils/soundEngine.ts`)
 
-Procedural clatter: a filtered noise tick plus a low housing knock, panned toward the board that's flipping. Voices are pooled so a full cascade doesn't clip. Sound starts muted, and the header toggle turns it on and off.
+Split-flap sound modelled on the mechanism. Each leaf landing is synthesised from:
+- a contact transient;
+- six damped, inharmonic plate modes (the ring of the leaf);
+- a short knock from the drum housing;
+- a quieter micro-rebound a few milliseconds later, matching the visual bounce.
+
+The latch release adds a faint tick, and a drum-motor whir with gear ripple swells with the number of turning drums. Sixteen landing variants and eight release variants are pre-rendered, then played with slight pitch and pan variation. Everything runs through a convolution reverb whose impulse response is generated for a large, hard-surfaced hall. Voices are pooled so a full cascade becomes a dense rattle without clipping.
+
+Sound starts muted, and the header toggle turns it on and off. `renderCascadePreview()` renders a full-board cascade offline, so you can audition the sound without the 3D scene.
 
 ## Static deployment
 

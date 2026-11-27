@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, typ
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import flapFontUrl from '@fontsource/jost/files/jost-latin-600-normal.woff?url';
-import { playFlap } from '../utils/soundEngine';
+import { playFlap, playRelease, setMechanismActivity } from '../utils/soundEngine';
 
 /*
  * Split-flap mechanism
@@ -62,6 +62,8 @@ interface CellDescriptor {
   incoming: SpoolState;
   stepStartAt: number;
   landed: boolean;
+  /** Whether the latch-release tick has sounded for the current step. */
+  released: boolean;
 }
 
 interface CellRegistration {
@@ -362,6 +364,7 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
           incoming: blank,
           stepStartAt: 0,
           landed: false,
+          released: true,
         });
         dirty.current = true;
         return;
@@ -407,6 +410,7 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
     for (const mesh of meshes) mesh!.count = count;
     let index = 0;
     let hasWork = false;
+    let turning = 0;
 
     for (const cell of cells.current.values()) {
       // Advance on wall-clock time, not frame count: if frames are slow (or the tab was hidden),
@@ -425,6 +429,7 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
           cell.stepStartAt = cell.nextStepAt;
           cell.active = true;
           cell.landed = false;
+          cell.released = false;
           continue;
         }
         break;
@@ -437,10 +442,16 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
       let back = cell.current;
 
       if (cell.active) {
+        turning += 1;
         const t = Math.min((now - cell.stepStartAt) / cell.stepDuration, 1);
+        const pan = THREE.MathUtils.clamp(cell.position[0] / 8, -1, 1);
+        if (!cell.released) {
+          cell.released = true;
+          playRelease(pan);
+        }
         if (!cell.landed && t >= FALL_FRACTION) {
           cell.landed = true;
-          playFlap(THREE.MathUtils.clamp(cell.position[0] / 8, -1, 1));
+          playFlap(pan);
         }
         angle = hingeAngle(t);
         top = cell.incoming;
@@ -475,6 +486,7 @@ export function SplitFlapBatch({ children }: { children: ReactNode }) {
       geometry.attributes.aGlyph.needsUpdate = true;
     }
     for (const mesh of meshes) mesh!.instanceMatrix.needsUpdate = true;
+    setMechanismActivity(turning);
     dirty.current = hasWork;
   });
 

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { makeCarpet, makeConcrete } from './textures';
+import { makeCarpet, makeCarpetMaterial, makeConcrete } from './textures';
 import { BALCONY, FLIGHT_TUBE, FLOOR_Y, SHELL_FRONT_Z, SHELL_HALF_WIDTH, glassTop, shellY, wallZ } from './layout';
 
 /*
@@ -205,12 +205,7 @@ function useFlankResources() {
           side: THREE.DoubleSide,
         }),
         tube: new THREE.MeshStandardMaterial({ color: '#F4F1EA', roughness: 0.55, side: THREE.DoubleSide }),
-        carpet: new THREE.MeshStandardMaterial({
-          map: carpet.map,
-          normalMap: carpet.normalMap,
-          roughnessMap: carpet.roughnessMap,
-          roughness: 1,
-        }),
+        carpet: makeCarpetMaterial(carpet),
       },
     };
   }, []);

@@ -1,16 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { CameraControls, ContactShadows, Environment, Lightformer, PerformanceMonitor } from '@react-three/drei';
-import { Bloom, EffectComposer, N8AO, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing';
+import { Bloom, EffectComposer, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
 import Board, { rowPosition, type Selection } from './scene/Board';
+import type { Board as BoardName } from '../data/governanceService';
 import Shell from './scene/Shell';
 import GlassWall from './scene/GlassWall';
 import SideWalls from './scene/SideWalls';
 import Lounges from './scene/Lounge';
 import Exterior, { SUN_DIRECTION } from './scene/Exterior';
-import { BOARD_Y, FLOOR_Y, validateLayout } from './scene/layout';
+import { BOARD_SIDE_OFFSET, BOARD_Y, FLOOR_Y, validateLayout } from './scene/layout';
+import { makeCameraColliders } from './scene/colliders';
 import type { BoardEntry } from '../data/governanceService';
 
 export type { Selection };
@@ -20,20 +22,31 @@ interface TWABoardHousingProps {
   arrivals: BoardEntry[];
   selection: Selection | null;
   onSelect: (selection: Selection) => void;
+  /** On narrow portrait screens, frame one board at a time so the flaps stay legible. */
+  focus: BoardName | null;
 }
 
 if (import.meta.env.DEV) {
   for (const problem of validateLayout()) console.error(`[layout] ${problem}`);
 }
 
+/** Phones and tablets: lighter shadows and resolution so the scene stays fluid. */
+const COARSE_POINTER = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+
 const HOME_TARGET = new THREE.Vector3(0, BOARD_Y + 0.5, 0);
 /** Default view: slightly below the board, looking up into the vault, as a visitor would. */
 const HOME_ELEVATION = -0.04;
 
-function CameraRig({ selection }: { selection: Selection | null }) {
+function CameraRig({ selection, focus }: { selection: Selection | null; focus: BoardName | null }) {
   const controls = useRef<CameraControls>(null);
   const size = useThree((state) => state.size);
   const camera = useThree((state) => state.camera) as THREE.PerspectiveCamera;
+  const colliders = useMemo(makeCameraColliders, []);
+
+  // Collision: the camera is pulled in front of the vault, walls, glass, balconies and floor.
+  useEffect(() => {
+    if (controls.current) controls.current.colliderMeshes = colliders;
+  }, [colliders]);
 
   useEffect(() => {
     const rig = controls.current;
@@ -49,7 +62,13 @@ function CameraRig({ selection }: { selection: Selection | null }) {
     const distance = Math.max(22, widthFit, heightFit);
     rig.maxDistance = Math.max(34, distance + 6);
 
-    if (!selection) {
+    const fit = (width: number) => width / (2 * Math.tan(halfFov) * aspect);
+    if (!selection && focus) {
+      // One board, straight on, filling the width of a portrait screen.
+      const x = (focus === 'departures' ? -1 : 1) * BOARD_SIDE_OFFSET;
+      const focusDistance = Math.max(12, fit(10.6));
+      void rig.setLookAt(x, HOME_TARGET.y, focusDistance, x, HOME_TARGET.y, HOME_TARGET.z, true);
+    } else if (!selection) {
       void rig.setLookAt(
         0,
         HOME_TARGET.y + distance * Math.sin(HOME_ELEVATION),
@@ -59,13 +78,19 @@ function CameraRig({ selection }: { selection: Selection | null }) {
         HOME_TARGET.z,
         true,
       );
+    } else if (aspect < 1) {
+      // Portrait: show the whole row, raised into the upper part of the screen above the dossier.
+      const row = rowPosition(selection);
+      const rowDistance = Math.max(9, fit(8.8));
+      const lift = rowDistance * Math.tan(halfFov) * 0.62;
+      void rig.setLookAt(row.x, row.y - lift, row.z + rowDistance, row.x, row.y - lift, row.z, true);
     } else {
       const row = rowPosition(selection);
       // On wide screens the dossier sits on the right, so frame the row left of centre.
       const shift = aspect > 1.1 ? 1.9 : 0;
       void rig.setLookAt(row.x * 0.92 + shift, row.y - 0.25, 9.2, row.x + shift, row.y, row.z, true);
     }
-  }, [camera, selection, size.height, size.width]);
+  }, [camera, focus, selection, size.height, size.width]);
 
   return (
     <CameraControls
@@ -115,7 +140,7 @@ function Lighting() {
         intensity={3.1}
         color="#FFF2DE"
         castShadow
-        shadow-mapSize={[4096, 4096]}
+        shadow-mapSize={COARSE_POINTER ? [2048, 2048] : [4096, 4096]}
         shadow-camera-left={-26}
         shadow-camera-right={26}
         shadow-camera-top={26}
@@ -140,20 +165,20 @@ function Lighting() {
   );
 }
 
+/*
+ * No screen-space ambient occlusion: its halos slide across the carpet as the view moves. Grounding
+ * comes from the sun's shadow maps, contact shadows and the occlusion baked into the vault.
+ */
 function PostProcessing({ quality }: { quality: 'high' | 'low' }) {
-  const bloom = <Bloom mipmapBlur luminanceThreshold={0.92} luminanceSmoothing={0.2} intensity={0.42} radius={0.7} />;
-  // Low tier drops ambient occlusion; the composer needs concrete effect children, not fragments.
-  return quality === 'high' ? (
+  return (
     <EffectComposer multisampling={0} enableNormalPass={false}>
-      <N8AO aoRadius={1.6} intensity={2.2} distanceFalloff={0.6} quality="medium" halfRes />
-      {bloom}
-      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-      <Vignette offset={0.32} darkness={0.42} />
-      <SMAA />
-    </EffectComposer>
-  ) : (
-    <EffectComposer multisampling={0} enableNormalPass={false}>
-      {bloom}
+      <Bloom
+        mipmapBlur
+        luminanceThreshold={0.92}
+        luminanceSmoothing={0.2}
+        intensity={quality === 'high' ? 0.42 : 0.3}
+        radius={0.7}
+      />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
       <Vignette offset={0.32} darkness={0.42} />
       <SMAA />
@@ -161,9 +186,10 @@ function PostProcessing({ quality }: { quality: 'high' | 'low' }) {
   );
 }
 
-export default function TWABoardHousing({ departures, arrivals, selection, onSelect }: TWABoardHousingProps) {
+export default function TWABoardHousing({ departures, arrivals, selection, onSelect, focus }: TWABoardHousingProps) {
   const [quality, setQuality] = useState<'high' | 'low'>('high');
-  const [dpr, setDpr] = useState(1.5);
+  const maxDpr = COARSE_POINTER ? 1.5 : 2;
+  const [dpr, setDpr] = useState(COARSE_POINTER ? 1.25 : 1.5);
 
   return (
     <Canvas
@@ -182,7 +208,7 @@ export default function TWABoardHousing({ departures, arrivals, selection, onSel
           setQuality('low');
           setDpr(1);
         }}
-        onIncline={() => setDpr(Math.min(2, window.devicePixelRatio))}
+        onIncline={() => setDpr(Math.min(maxDpr, window.devicePixelRatio))}
       />
       <fog attach="fog" args={['#C9D6DD', 140, 900]} />
       <TerminalEnvironment />
@@ -203,7 +229,7 @@ export default function TWABoardHousing({ departures, arrivals, selection, onSel
         color="#3A1517"
         frames={1}
       />
-      <CameraRig selection={selection} />
+      <CameraRig selection={selection} focus={focus} />
       <PostProcessing quality={quality} />
     </Canvas>
   );

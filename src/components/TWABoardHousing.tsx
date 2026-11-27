@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import Board, { rowPosition, type Selection } from './scene/Board';
 import Shell from './scene/Shell';
 import GlassWall from './scene/GlassWall';
+import SideWalls from './scene/SideWalls';
 import Lounges from './scene/Lounge';
 import Exterior, { SUN_DIRECTION } from './scene/Exterior';
 import { BOARD_Y, FLOOR_Y, validateLayout } from './scene/layout';
@@ -189,6 +190,7 @@ export default function TWABoardHousing({ departures, arrivals, selection, onSel
       <Exterior />
       <Shell />
       <GlassWall />
+      <SideWalls />
       <Lounges />
       <Board departures={departures} arrivals={arrivals} selection={selection} onSelect={onSelect} />
       <ContactShadows

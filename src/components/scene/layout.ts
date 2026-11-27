@@ -61,6 +61,12 @@ export function shellBackZ(x: number): number {
   return glassTop(x).z - 0.9;
 }
 
+/** Oval portal into a flight tube, cut into each side wall (z range, heights above the floor). */
+export const FLIGHT_TUBE = { z0: -1.6, z1: 3.4, springHeight: 2.0, crownHeight: 3.2, length: 16 };
+
+/** Upper balcony along each side wall (z range, projection from the wall, deck height above floor). */
+export const BALCONY = { z0: 2, z1: 27, depth: 2.4, deckHeight: 4.6 };
+
 export interface LoungePlacement {
   x: number;
   z: number;
@@ -87,7 +93,10 @@ export function validateLayout(): string[] {
       }
     });
     if (a.z - a.radius < wallZ(a.x) + 1) problems.push(`Lounge ${i} intersects the window wall.`);
-    if (Math.abs(a.x) + a.radius > SHELL_HALF_WIDTH - 1) problems.push(`Lounge ${i} is outside the hall.`);
+    if (Math.abs(a.x) + a.radius > SHELL_HALF_WIDTH - BALCONY.depth - 0.5) {
+      problems.push(`Lounge ${i} runs under the side balcony.`);
+    }
   });
+  if (FLIGHT_TUBE.crownHeight > BALCONY.deckHeight - 1.2) problems.push('Flight tube portal cuts into the balcony soffit.');
   return problems;
 }

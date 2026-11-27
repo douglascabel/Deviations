@@ -13,7 +13,7 @@ for (const url of urls) {
       signal: AbortSignal.timeout(20_000),
     });
     // Some official sites refuse automated clients; that says nothing about whether the page exists.
-    const blocked = [401, 403, 429].includes(response.status);
+    const blocked = [401, 403, 405, 429].includes(response.status);
     const ok = response.status < 400;
     if (!ok && !blocked) failures += 1;
     const label = ok ? 'ok  ' : blocked ? 'BOT?' : 'FAIL';

@@ -58,20 +58,27 @@ The static site is written to `dist/`. Run `npm run check-links` to verify that 
   - nose and main gear whose tyres sit exactly on the apron.
 - `Exterior.tsx` builds the gradient sky with sun glow, the apron with taxi markings, the parked and taxiing jets with soft ground shadows, and a distant tower and hangars.
 - `textures.ts` generates tileable procedural PBR maps (colour, normal, roughness) for concrete, carpet, upholstery and tarmac. There are no binary assets, and nothing is downloaded at runtime.
-- Rendering uses soft shadow maps and contact shadows, image-based lighting from code-generated light cards (no HDRI download), N8AO ambient occlusion, bloom, ACES Filmic tone mapping, SMAA and a vignette. `PerformanceMonitor` drops AO and resolution on slower GPUs.
-- `CameraControls` provides damped orbit and zoom within limits that keep the view inside the hall, and glides to a row when it's selected. Portrait screens get a wider lens.
+- Rendering uses soft shadow maps and contact shadows, image-based lighting from code-generated light cards (no HDRI download), bloom, ACES Filmic tone mapping, SMAA and a vignette. `PerformanceMonitor` lowers resolution and bloom on slower GPUs.
+- `CameraControls` provides damped orbit and zoom, and glides to a row when it's selected.
+  - `colliders.ts` holds invisible low-resolution copies of the vault, walls, glass, balconies and floor. The camera collides with these, so it can never pass through a surface. Clipping through geometry was what made walls look see-through.
+  - Phones in portrait get a wider lens and frame one board at a time, with a Departures / Arrivals switch. They also get lighter shadow maps and a capped pixel ratio.
+- There's no screen-space ambient occlusion: its halos slid across the floor as the view moved. Grounding comes from the sun's shadow maps, contact shadows and the occlusion baked into the vault.
+- The carpet is a fabric material: almost no specular, and a faint rough sheen at grazing angles.
 
 ### Sound (`src/utils/soundEngine.ts`)
 
-Split-flap sound modelled on the mechanism. Each leaf landing is synthesised from:
-- a contact transient;
-- six damped, inharmonic plate modes (the ring of the leaf);
-- a short knock from the drum housing;
-- a quieter micro-rebound a few milliseconds later, matching the visual bounce.
+The board plays a recorded split-flap clatter, `public/sounds/split-flap-loop.mp3`, **only while flaps are moving**.
+- **Two voices:** one loop voice per board, panned to its side. Each voice's level follows how many of that board's drums are turning, so one row is quieter than a full cascade.
+- **Start and stop:** each voice starts at a random point in the loop and fades out within a fraction of a second when the board comes to rest.
+- **Fallback:** if the file can't be loaded, the engine falls back to physically modelled per-flap synthesis (plate modes, housing knock, rebound, latch tick and motor whir) through a generated hall reverb.
 
-The latch release adds a faint tick, and a drum-motor whir with gear ripple swells with the number of turning drums. Sixteen landing variants and eight release variants are pre-rendered, then played with slight pitch and pan variation. Everything runs through a convolution reverb whose impulse response is generated for a large, hard-surfaced hall. Voices are pooled so a full cascade becomes a dense rattle without clipping.
+Sound starts muted, and the header toggle turns it on and off.
 
-Sound starts muted, and the header toggle turns it on and off. `renderCascadePreview()` renders a full-board cascade offline, so you can audition the sound without the 3D scene.
+**About the recording.** The loop was cut from a clip of the *Jet Lag: The Game* intro on a split-flap display, which you supplied. Its rights belong to that show's creators. Before distributing the site publicly, replace it with a recording you own or one licensed for reuse (for example CC0). Swapping that single file is all it takes. To rebuild a loop from a new recording:
+1. trim it to the clatter only;
+2. even out its level;
+3. crossfade the end into the start;
+4. encode it as MP3.
 
 ## Static deployment
 

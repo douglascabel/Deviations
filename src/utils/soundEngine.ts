@@ -1,5 +1,14 @@
 /*
- * Split-flap sound, modelled on the mechanism rather than on noise bursts.
+ * Split-flap sound.
+ *
+ * Primary mode: a recorded split-flap clatter (public/sounds/split-flap-loop.mp3), looped and
+ * heard only while flaps are moving. One voice per board is panned to its side; each voice's level
+ * follows how many of that board's drums are turning, starts at a random point in the loop, and
+ * fades out within a fraction of a second when the board comes to rest. To use a different
+ * recording, replace that one file.
+ *
+ * Fallback mode (if the recording cannot be loaded): per-flap synthesis, modelled on the mechanism
+ * rather than on noise bursts.
  *
  * A Solari leaf is a thin plate released by a latch; it falls, slaps the stop of the leaf below,
  * rebounds once and settles, while the drum's motor and gear train run underneath. Each event is
@@ -18,9 +27,19 @@ const MAX_RELEASES_PER_WINDOW = 2;
 const LANDING_VARIANTS = 16;
 const RELEASE_VARIANTS = 8;
 
+interface LoopVoice {
+  source: AudioBufferSourceNode;
+  gain: GainNode;
+  level: number;
+}
+
 interface Engine {
   context: BaseAudioContext;
   bus: GainNode;
+  /** Recorded clatter, once loaded; when present, per-flap synthesis is skipped. */
+  loop: AudioBuffer | null;
+  loopBus: GainNode;
+  voices: Record<'left' | 'right', LoopVoice | null>;
   landings: AudioBuffer[];
   releases: AudioBuffer[];
   motorGain: GainNode;
@@ -240,25 +259,102 @@ function createEngine(context: BaseAudioContext): Engine {
   air.connect(dry).connect(compressor);
   air.connect(reverb).connect(wet).connect(compressor);
 
+  // The recording already carries its own room; give it only a light send into the hall reverb.
+  const loopBus = context.createGain();
+  loopBus.gain.value = 0.9;
+  const loopSend = context.createGain();
+  loopSend.gain.value = 0.18;
+  loopBus.connect(compressor);
+  loopBus.connect(loopSend).connect(reverb);
+
   return {
     context,
     bus,
+    loop: null,
+    loopBus,
+    voices: { left: null, right: null },
     landings: Array.from({ length: LANDING_VARIANTS }, () => toBuffer(context, renderLanding(rate))),
     releases: Array.from({ length: RELEASE_VARIANTS }, () => toBuffer(context, renderRelease(rate))),
     motorGain: makeMotor(context, bus),
   };
 }
 
+const LOOP_URL = `${import.meta.env.BASE_URL}sounds/split-flap-loop.mp3`;
+/** Skip MP3 encoder padding at both ends so the loop wraps without a gap. */
+const LOOP_MARGIN = 0.03;
+
+async function loadLoop(target: Engine): Promise<void> {
+  try {
+    const response = await fetch(LOOP_URL);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    target.loop = await target.context.decodeAudioData(await response.arrayBuffer());
+  } catch (error) {
+    console.warn('Split-flap recording unavailable; using synthesised clatter.', error);
+  }
+}
+
 export async function unmuteSound(): Promise<void> {
-  if (!engine || engine.context.state === 'closed') engine = createEngine(new AudioContext());
+  if (!engine || engine.context.state === 'closed') {
+    engine = createEngine(new AudioContext());
+    void loadLoop(engine);
+  }
   await (engine.context as AudioContext).resume();
   muted = false;
 }
 
 export function muteSound(): void {
   muted = true;
-  if (engine) engine.motorGain.gain.setTargetAtTime(0, engine.context.currentTime, 0.05);
+  if (engine) {
+    engine.motorGain.gain.setTargetAtTime(0, engine.context.currentTime, 0.05);
+    releaseVoice(engine, 'left');
+    releaseVoice(engine, 'right');
+  }
   motorLevel = 0;
+}
+
+function releaseVoice(target: Engine, side: 'left' | 'right'): void {
+  const voice = target.voices[side];
+  if (!voice) return;
+  const now = target.context.currentTime;
+  voice.gain.gain.cancelScheduledValues(now);
+  voice.gain.gain.setTargetAtTime(0, now, 0.06);
+  voice.source.stop(now + 0.5);
+  target.voices[side] = null;
+}
+
+/** Start, adjust or fade the looped clatter for one board. */
+function driveVoice(target: Engine, side: 'left' | 'right', turning: number): void {
+  const loop = target.loop;
+  if (!loop) return;
+  const level = turning > 0 ? Math.min(1, Math.sqrt(turning / 60)) * 0.85 : 0;
+  const voice = target.voices[side];
+  const now = target.context.currentTime;
+  if (level === 0) {
+    releaseVoice(target, side);
+    return;
+  }
+  if (!voice) {
+    const context = target.context;
+    const source = context.createBufferSource();
+    source.buffer = loop;
+    source.loop = true;
+    source.loopStart = LOOP_MARGIN;
+    source.loopEnd = loop.duration - LOOP_MARGIN;
+    source.playbackRate.value = random(0.97, 1.03);
+    const gain = context.createGain();
+    gain.gain.value = 0;
+    gain.gain.setTargetAtTime(level, now, 0.025);
+    const panner = context.createStereoPanner();
+    panner.pan.value = side === 'left' ? -0.55 : 0.55;
+    source.connect(gain).connect(panner).connect(target.loopBus);
+    source.start(now, random(LOOP_MARGIN, loop.duration - LOOP_MARGIN - 0.1));
+    target.voices[side] = { source, gain, level };
+    return;
+  }
+  if (Math.abs(level - voice.level) > 0.03) {
+    voice.level = level;
+    voice.gain.gain.setTargetAtTime(level, now, 0.06);
+  }
 }
 
 export function isSoundMuted(): boolean {
@@ -292,7 +388,7 @@ function play(target: Engine, buffer: AudioBuffer, pan: number, gain: number, wh
 /** A leaf lands on its stop. @param pan -1 (left board) to 1 (right board). */
 export function playFlap(pan = 0): void {
   const target = ready();
-  if (!target || landingsInWindow >= MAX_LANDINGS_PER_WINDOW) return;
+  if (!target || target.loop || landingsInWindow >= MAX_LANDINGS_PER_WINDOW) return;
   landingsInWindow += 1;
   play(target, target.landings[Math.floor(Math.random() * target.landings.length)], pan, random(0.32, 0.5));
 }
@@ -300,14 +396,23 @@ export function playFlap(pan = 0): void {
 /** The latch releases the next leaf. */
 export function playRelease(pan = 0): void {
   const target = ready();
-  if (!target || releasesInWindow >= MAX_RELEASES_PER_WINDOW) return;
+  if (!target || target.loop || releasesInWindow >= MAX_RELEASES_PER_WINDOW) return;
   releasesInWindow += 1;
   play(target, target.releases[Math.floor(Math.random() * target.releases.length)], pan, random(0.1, 0.18));
 }
 
-/** Drive the motor whir from the number of drums currently turning. */
-export function setMechanismActivity(activeCells: number): void {
-  if (!engine || muted) return;
+/**
+ * Report how many drums are turning on each board. With the recording loaded this drives the
+ * looped clatter (silent at rest); otherwise it drives the synthesised motor whir.
+ */
+export function setMechanismActivity(leftCells: number, rightCells = 0): void {
+  if (!engine || muted || engine.context.state !== 'running') return;
+  if (engine.loop) {
+    driveVoice(engine, 'left', leftCells);
+    driveVoice(engine, 'right', rightCells);
+    return;
+  }
+  const activeCells = leftCells + rightCells;
   const level = Math.min(1, Math.sqrt(activeCells / 160)) * 0.035;
   if (Math.abs(level - motorLevel) < 0.004) return;
   motorLevel = level;

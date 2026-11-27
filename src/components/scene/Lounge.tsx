@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { makeCarpet, makeConcrete, makeUpholstery } from './textures';
+import { makeCarpet, makeCarpetMaterial, makeConcrete, makeUpholstery } from './textures';
 import { FLOOR_Y, LOUNGES, SHELL_FRONT_Z, SHELL_HALF_WIDTH, wallZ } from './layout';
 
 const BENCH_ARC = Math.PI * 1.7;
@@ -161,12 +161,7 @@ export default function Lounges() {
         roughness: 0.62,
         side: THREE.DoubleSide,
       }),
-      carpet: new THREE.MeshStandardMaterial({
-        map: wellCarpet.map,
-        normalMap: wellCarpet.normalMap,
-        roughnessMap: wellCarpet.roughnessMap,
-        roughness: 1,
-      }),
+      carpet: makeCarpetMaterial(wellCarpet),
       upholstery: new THREE.MeshPhysicalMaterial({
         color: '#B51E30',
         normalMap: weave.normalMap,
@@ -186,14 +181,7 @@ export default function Lounges() {
         side: THREE.DoubleSide,
       }),
     };
-    const floorMaterial = new THREE.MeshStandardMaterial({
-      map: carpet.map,
-      normalMap: carpet.normalMap,
-      normalScale: new THREE.Vector2(0.8, 0.8),
-      roughnessMap: carpet.roughnessMap,
-      roughness: 1,
-      envMapIntensity: 0.6,
-    });
+    const floorMaterial = makeCarpetMaterial(carpet, 0.8);
     return { floor, floorMaterial, materials };
   }, []);
 

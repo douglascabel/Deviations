@@ -239,3 +239,23 @@ export function makeTarmac(): THREE.CanvasTexture {
   texture.anisotropy = 8;
   return texture;
 }
+
+/**
+ * Cut-pile carpet as a fabric, not a hard floor: no mirror-like specular (fibres scatter light),
+ * a faint, rough sheen that only rises at grazing angles, and low environment reflection.
+ */
+export function makeCarpetMaterial(set: PbrSet, normalStrength = 0.7): THREE.MeshPhysicalMaterial {
+  return new THREE.MeshPhysicalMaterial({
+    map: set.map,
+    normalMap: set.normalMap,
+    normalScale: new THREE.Vector2(normalStrength, normalStrength),
+    roughnessMap: set.roughnessMap,
+    roughness: 1,
+    metalness: 0,
+    specularIntensity: 0.08,
+    sheen: 0.55,
+    sheenColor: new THREE.Color('#7A1621'),
+    sheenRoughness: 0.9,
+    envMapIntensity: 0.3,
+  });
+}
